@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Sotira helps teams model the profitability impact of returns strategies."
+      content="Sotira simulates how returns strategies affect profitability, inventory, and future sales."
     />
     <title>Sotira | Returns Strategy Optimizer</title>
     <style>
@@ -155,6 +155,50 @@
         font-weight: 400;
       }
 
+      .simulator {
+        display: grid;
+        grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+        gap: 32px;
+        align-items: start;
+      }
+
+      .controls,
+      .chart {
+        padding: 28px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.62);
+      }
+
+      .controls { box-shadow: 10px 10px 0 var(--lime); }
+      .control { margin-top: 22px; }
+      .control:first-of-type { margin-top: 0; }
+      .control-head { display: flex; justify-content: space-between; margin-bottom: 8px; font-family: Arial, sans-serif; font-size: 0.82rem; }
+      .control-head output { color: var(--forest); font-weight: 700; }
+      input[type="range"] { width: 100%; accent-color: var(--forest); }
+      .strategy-title { margin: 28px 0 10px; }
+      .strategies { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+      .strategies input { position: absolute; opacity: 0; }
+      .strategies label { display: block; min-height: 82px; padding: 10px; border: 1px solid var(--line); border-radius: 3px; cursor: pointer; font-family: Arial, sans-serif; font-size: 0.74rem; line-height: 1.35; }
+      .strategies label strong { display: block; margin-bottom: 5px; color: var(--forest); }
+      .strategies input:checked + label { border-color: var(--forest); background: var(--lime); }
+      .results { min-width: 0; }
+      .results-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 18px; }
+      .results-head h2 { margin: 0; font-size: 2rem; font-weight: 400; }
+      .selected { color: var(--muted); font-family: Arial, sans-serif; font-size: 0.78rem; text-align: right; }
+      .selected strong { display: block; color: var(--forest); font-size: 0.95rem; }
+      .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .metrics .metric { padding: 18px 14px; background: rgba(255, 255, 255, 0.62); }
+      .metrics .metric span { display: block; min-height: 30px; }
+      .metrics .metric strong { display: block; margin-top: 10px; font-size: 1.8rem; }
+      .chart { margin-top: 20px; }
+      .bar-row { display: grid; grid-template-columns: 120px 1fr 55px; gap: 10px; align-items: center; margin-top: 16px; font-family: Arial, sans-serif; font-size: 0.78rem; }
+      .bar-track { height: 10px; overflow: hidden; border-radius: 10px; background: rgba(22, 35, 31, 0.1); }
+      .bar { width: 0; height: 100%; background: var(--forest); transition: width 180ms ease; }
+      .bar.sales { background: #e58c5a; }
+      .bar-row output { color: var(--forest); font-weight: 700; text-align: right; }
+      .insight { margin: 24px 0 0; color: var(--muted); font-family: Arial, sans-serif; font-size: 0.75rem; line-height: 1.5; }
+
       footer {
         padding: 24px 0 30px;
         border-top: 1px solid var(--line);
@@ -175,9 +219,13 @@
           padding: 72px 0 88px;
         }
 
-        .panel {
-          margin-top: 56px;
-        }
+        .simulator { display: block; }
+        .results { margin-top: 56px; }
+      }
+
+      @media (max-width: 500px) {
+        .metrics { grid-template-columns: 1fr; }
+        .strategies { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -191,22 +239,72 @@
       <main>
         <section aria-labelledby="page-title">
           <p class="eyebrow">Make every return count</p>
-          <h1 id="page-title">Better returns. Clearer decisions.</h1>
-          <p class="intro">
-            Sotira helps operations teams explore how returns policies affect cost,
-            recovery, and customer value.
-          </p>
+          <h1 id="page-title">See the cost of every choice.</h1>
+          <p class="intro">Model how your returns policy changes recovered inventory, margin, and future sales. Adjust the operating assumptions and compare the result instantly.</p>
         </section>
 
-        <aside class="panel" aria-label="Product preview">
-          <p class="panel-label">Strategy snapshot</p>
-          <div class="metric"><span>Recovery rate</span><strong>78%</strong></div>
-          <div class="metric"><span>Cost avoided</span><strong>$42k</strong></div>
-          <div class="metric"><span>Confidence</span><strong>High</strong></div>
-        </aside>
+        <div class="simulator">
+          <section class="controls" aria-labelledby="controls-title">
+            <p class="panel-label" id="controls-title">Your operation</p>
+            <div class="control"><div class="control-head"><label for="orders">Monthly orders</label><output id="orders-output">10,000</output></div><input id="orders" type="range" min="1000" max="50000" step="1000" value="10000"></div>
+            <div class="control"><div class="control-head"><label for="return-rate">Return rate</label><output id="return-rate-output">18%</output></div><input id="return-rate" type="range" min="2" max="40" value="18"></div>
+            <div class="control"><div class="control-head"><label for="order-value">Average order value</label><output id="order-value-output">$85</output></div><input id="order-value" type="range" min="20" max="250" step="5" value="85"></div>
+            <div class="control"><div class="control-head"><label for="handling-cost">Handling cost per return</label><output id="handling-cost-output">$9</output></div><input id="handling-cost" type="range" min="2" max="30" value="9"></div>
+            <p class="panel-label strategy-title">Choose a recovery path</p>
+            <div class="strategies" role="radiogroup" aria-label="Recovery strategy">
+              <div><input id="restock" name="strategy" type="radio" value="restock" checked><label for="restock"><strong>Restock</strong>Full-price inventory.</label></div>
+              <div><input id="discount" name="strategy" type="radio" value="discount"><label for="discount"><strong>Discount</strong>Move stock faster.</label></div>
+              <div><input id="recycle" name="strategy" type="radio" value="recycle"><label for="recycle"><strong>Recycle</strong>Limit handling.</label></div>
+            </div>
+          </section>
+
+          <section class="results" aria-labelledby="results-title" aria-live="polite">
+            <div class="results-head"><div><p class="panel-label">Live projection</p><h2 id="results-title">The monthly impact</h2></div><div class="selected">Selected path<strong id="strategy-output">Restock</strong></div></div>
+            <div class="metrics">
+              <div class="metric"><span>Net value recovered</span><strong id="recovered-output">$111k</strong></div>
+              <div class="metric"><span>Return operations cost</span><strong id="cost-output">$16k</strong></div>
+              <div class="metric"><span>Future sales protected</span><strong id="sales-output">1,404</strong></div>
+            </div>
+            <div class="chart"><p class="panel-label">What happens to returned units</p><div class="bar-row"><span>Recovered</span><div class="bar-track"><div class="bar" id="recovered-bar"></div></div><output id="recovered-percent">86%</output></div><div class="bar-row"><span>Future sales</span><div class="bar-track"><div class="bar sales" id="sales-bar"></div></div><output id="sales-percent">78%</output></div><p class="insight" id="insight">Restocking preserves the most future selling capacity when returned items are still in good condition.</p></div>
+          </section>
+        </div>
       </main>
 
       <footer>© 2026 Sotira. Built for smarter commerce operations.</footer>
     </div>
+    <script>
+      const inputs = ['orders', 'return-rate', 'order-value', 'handling-cost'];
+      const strategies = {
+        restock: { label: 'Restock', recovery: 0.86, sales: 0.78, cost: 1, insight: 'Restocking preserves the most future selling capacity when returned items are still in good condition.' },
+        discount: { label: 'Discount', recovery: 0.68, sales: 0.61, cost: 0.82, insight: 'Discounting trades margin for faster inventory movement and a lower risk of items sitting unsold.' },
+        recycle: { label: 'Recycle', recovery: 0.29, sales: 0.18, cost: 0.48, insight: 'Recycling limits handling effort on damaged stock, but gives up most of its future sales potential.' }
+      };
+      const formatNumber = (value) => Math.round(value).toLocaleString();
+      const formatMoney = (value) => `$${Math.round(value).toLocaleString()}k`;
+      function update() {
+        const orders = Number(document.querySelector('#orders').value);
+        const returnRate = Number(document.querySelector('#return-rate').value) / 100;
+        const orderValue = Number(document.querySelector('#order-value').value);
+        const handlingCost = Number(document.querySelector('#handling-cost').value);
+        const strategy = strategies[document.querySelector('input[name="strategy"]:checked').value];
+        const returned = orders * returnRate;
+        document.querySelector('#orders-output').textContent = formatNumber(orders);
+        document.querySelector('#return-rate-output').textContent = `${returnRate * 100}%`;
+        document.querySelector('#order-value-output').textContent = `$${orderValue}`;
+        document.querySelector('#handling-cost-output').textContent = `$${handlingCost}`;
+        document.querySelector('#strategy-output').textContent = strategy.label;
+        document.querySelector('#recovered-output').textContent = formatMoney(returned * orderValue * strategy.recovery / 1000);
+        document.querySelector('#cost-output').textContent = formatMoney(returned * handlingCost * strategy.cost / 1000);
+        document.querySelector('#sales-output').textContent = formatNumber(returned * strategy.sales);
+        document.querySelector('#recovered-percent').textContent = `${strategy.recovery * 100}%`;
+        document.querySelector('#sales-percent').textContent = `${strategy.sales * 100}%`;
+        document.querySelector('#recovered-bar').style.width = `${strategy.recovery * 100}%`;
+        document.querySelector('#sales-bar').style.width = `${strategy.sales * 100}%`;
+        document.querySelector('#insight').textContent = strategy.insight;
+      }
+      inputs.forEach((id) => document.querySelector(`#${id}`).addEventListener('input', update));
+      document.querySelectorAll('input[name="strategy"]').forEach((input) => input.addEventListener('change', update));
+      update();
+    </script>
   </body>
 </html>
